@@ -1,0 +1,6 @@
+streamlit
+openai
+flask
+requests
+youtube-transcript-api
+requests

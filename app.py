@@ -1,21 +1,14 @@
 import streamlit as st
-from youtube_transcript_api import YouTubeTranscriptApi
-import openai
-import time
+import requests
 import re
-import os
-from dotenv import load_dotenv
-load_dotenv()
+import time
+from youtube_transcript_api import YouTubeTranscriptApi
 
-
-# ---- SETUP ---- #
-
-assistant_id = "asst_7db5YXfZAUjQ8htf3PY7ZuDL"
-client = openai.Client(api_key=os.getenv("OPENAI_API_KEY"))
-
-# Create a thread once
-thread = client.beta.threads.create()
-thread_id = thread.id
+# ---- AZURE OPENAI CONFIG ---- #
+AZURE_OPENAI_ENDPOINT = "https://emailsender231.openai.azure.com/"
+AZURE_OPENAI_KEY = "7ZN2Pw4PMttsHR3newyNxG99I7T4aI6s568SiCMnC2wMnNSKNJPgJQQJ99BDACHYHv6XJ3w3AAABACOGjt3s"
+AZURE_OPENAI_DEPLOYMENT = "gpt-35-turbo"  # Example: "gpt-35-turbo"
+AZURE_OPENAI_API_VERSION = "2023-12-01-preview"
 
 # ---- FUNCTIONS ---- #
 def extract_video_id(url):
@@ -35,30 +28,29 @@ def get_transcript(video_url):
         st.error(f"Transcript error: {e}")
         return None
 
-def get_assistant_response(content, instructions):
-    message = client.beta.threads.messages.create(
-        thread_id=thread_id,
-        role='user',
-        content=content
-    )
+def get_azure_openai_response(prompt, system_message="You are a helpful assistant."):
+    url = f"{AZURE_OPENAI_ENDPOINT}openai/deployments/{AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version={AZURE_OPENAI_API_VERSION}"
 
-    run = client.beta.threads.runs.create(
-        thread_id=thread_id,
-        assistant_id=assistant_id,
-        instructions=instructions
-    )
+    headers = {
+        "Content-Type": "application/json",
+        "api-key": AZURE_OPENAI_KEY
+    }
 
-    with st.spinner("Processing..."):
-        while True:
-            run_status = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
-            if run_status.status == 'completed':
-                break
-            elif run_status.status == 'failed':
-                raise Exception("Assistant run failed.")
-            time.sleep(5)
+    body = {
+        "messages": [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.7,
+        "max_tokens": 2000
+    }
 
-    messages = client.beta.threads.messages.list(thread_id=thread_id)
-    return messages.data[0].content[0].text.value
+    response = requests.post(url, headers=headers, json=body)
+
+    if response.status_code == 200:
+        return response.json()["choices"][0]["message"]["content"]
+    else:
+        raise Exception(f"Azure OpenAI Error {response.status_code}: {response.text}")
 
 # ---- STREAMLIT UI ---- #
 st.set_page_config(page_title="YouTube Reaction Generator", layout="centered")
@@ -87,12 +79,12 @@ if st.button("🚀 Generate"):
                         f"Additional notes: {add_info or 'None'}\n\nTranscript:\n{transcript}"
                     )
                     instructions = "Follow the user's prompt strictly. Avoid any markdown or styling symbols like *, #, etc."
-                    response = get_assistant_response(prompt, instructions)
+                    response = get_azure_openai_response(prompt, system_message=instructions)
                     st.subheader("🗣️ AI-Generated Script")
                     st.write(response)
             else:
                 instructions = "Use the same tone as in the prompt. Reply like a human would."
-                response = get_assistant_response(user_input, instructions)
+                response = get_azure_openai_response(user_input, system_message=instructions)
                 st.subheader("💬 Assistant Response")
                 st.write(response)
         except Exception as e:
