@@ -3,11 +3,15 @@ from youtube_transcript_api import YouTubeTranscriptApi
 import openai
 import time
 import re
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 
 # ---- SETUP ---- #
-openai.api_key = "sk-proj-tcku5huQhPhWgkz0P4h9T3BlbkFJX0mFPNpHZjpNOqSLfrSF"
+
 assistant_id = "asst_7db5YXfZAUjQ8htf3PY7ZuDL"
-client = openai.Client(api_key=openai.api_key)
+client = openai.Client(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Create a thread once
 thread = client.beta.threads.create()
